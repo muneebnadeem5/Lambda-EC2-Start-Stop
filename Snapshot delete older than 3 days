@@ -1,0 +1,73 @@
+import boto3
+import json
+from datetime import datetime, timezone, timedelta
+from botocore.exceptions import ClientError
+
+def lambda_handler(event, context):
+    N = 3
+
+    date_N_days_ago = datetime.now(timezone.utc) - timedelta(days=N)
+
+    # print(datetime.now())
+    # print(date_N_days_ago)
+
+
+    client = boto3.client('ec2', region_name='eu-central-1', aws_access_key_id='AKIAR5JLW6BQ3LIBHHAO',
+                          aws_secret_access_key='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')
+
+    response = client.describe_snapshots(
+        Filters=[
+            {
+                'Name': 'volume-id',
+                'Values': ['vol-054c3f17bfd33eddc',
+                    'vol-026d5242fc8e23556',
+                    'vol-060fc301b093e37c8',
+                    'vol-0105bc9f2200ac988',
+                    'vol-080d1743721a8fe58',
+                    'vol-095234dba9a0bc817',
+                    'vol-02e2ba5189ec6a37e',
+                    'vol-0c3c18409784c03ad',
+                    'vol-01d233f6431e04c56',
+                    'vol-010814323c0f3103a',
+                    'vol-0c0179a1d8d7066e1',
+                    'vol-0f526cde246c639c4',
+                    'vol-0b0beeb294246a1f4',
+                    'vol-0be1c8a05aa81b35f',
+                    'vol-0ee91022d2cbc6251'
+                          ],
+            },
+            {
+                'Name': 'status',
+                'Values': [
+                    'completed',
+                ],
+            },
+        ],
+    )
+
+
+    snapshots=response.get('Snapshots')
+
+    for snapshot in snapshots:
+        # print(snapshot.get('Description'))
+        # print(snapshot.get('StartTime'))
+        snapshotTime=snapshot.get('StartTime')
+        if snapshotTime < date_N_days_ago:
+            print('Going to Delete Snapshot ... ')
+            print(snapshot.get('Description'))
+            # print(snapshot.get('SnapshotId'))
+            snapshotId=snapshot.get('SnapshotId')
+            try:
+                 client.delete_snapshot(
+                    SnapshotId=snapshotId
+                )
+                 print('Snapshot deleted : %s of' % snapshotId)
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'InvalidSnapshot.InUse':
+                    print('skipping this snapshot %s it is already being used.' % snapshotId)
+                    continue
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps('lambda Executed!')
+    }
